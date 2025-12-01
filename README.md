@@ -1,50 +1,54 @@
-# Welcome to your Expo app 👋
+# 🏰 Eventyrhagen - Digital Krysseliste
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**Eventyrhagen** er en moderne og sikker mobilapplikasjon utviklet for å erstatte den gamle Excel-baserte krysselisten i barnehager. Appen fokuserer på brukervennlighet, sikkerhet og GDPR-samsvar.
 
-## Get started
+Løsningen skiller tydelig mellom foresatte og ansatte for å sikre at sensitive data kun er tilgjengelig for de med riktig tilgang.
 
-1. Install dependencies
+## 📱 Funksjonalitet
 
-   ```bash
-   npm install
-   ```
+### 👨‍👩‍👧 For Foresatte
 
-2. Start the app
+- **Enkel oversikt:** Se status på egne barn (Til stede / Hentet).
+- **Sjekk inn/ut:** Lever og hent barna med ett trykk.
+- **Meld fravær:** Enkelt grensesnitt for å melde sykdom eller fri.
+- **Personvern:** Ser kun informasjon om sine egne barn.
 
-   ```bash
-   npx expo start
-   ```
+### 🧑‍🏫 For Ansatte
 
-In the output, you'll find options to open the app in a
+- **Totaloversikt:** Se hvor mange barn som er til stede, ute eller syke.
+- **Kontaktinfo:** Rask tilgang til foresattes telefonnummer ved behov.
+- **Nødliste:** Alltid oppdatert liste over barna.
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### 🛡️ For Administrator
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+- **Brukertilgang:** Opprett barn og koble dem til foresattes e-postadresser.
+- **Sikkerhet:** Rollebasert tilgangskontroll (RBAC).
 
-## Get a fresh project
+---
 
-When you're ready, run:
+## 🛠️ Teknologisk Stack
+
+Prosjektet er bygget med moderne web-teknologier optimalisert for mobil.
+
+- **Frontend:** [React Native](https://reactnative.dev/) med [Expo](https://expo.dev/)
+- **Backend:** [Google Firebase](https://firebase.google.com/)
+  - **Authentication:** Sikker innlogging.
+  - **Firestore:** NoSQL skydatabase i sanntid.
+- **Navigasjon:** React Navigation.
+
+---
+
+## 🚀 Kom i gang
+
+Følg disse stegene for å kjøre prosjektet lokalt på din maskin.
+
+### 1. Forutsetninger
+
+Du må ha [Node.js](https://nodejs.org/) installert på maskinen din.
+
+### 2. Klon prosjektet
 
 ```bash
-npm run reset-project
+git clone [https://github.com/kripe00/Eventyrhagen.git](https://github.com/kripe00/Eventyrhagen.git)
+cd Eventyrhagen
 ```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
