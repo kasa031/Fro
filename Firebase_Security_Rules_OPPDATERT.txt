@@ -1,0 +1,268 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ============================================
+    // HJELPEFUNKSJONER
+    // ============================================
+    
+    // Sjekk om bruker er autentisert
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Hent brukerens rolle
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    // Hent brukerens avdeling (for employees)
+    function getUserDepartment() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.department;
+    }
+    
+    // Sjekk om bruker er admin
+    function isAdmin() {
+      return isAuthenticated() && getUserRole() == 'admin';
+    }
+    
+    // Sjekk om bruker er employee
+    function isEmployee() {
+      return isAuthenticated() && getUserRole() == 'employee';
+    }
+    
+    // Sjekk om bruker er parent
+    function isParent() {
+      return isAuthenticated() && getUserRole() == 'parent';
+    }
+    
+    // Sjekk om bruker er staff (admin eller employee)
+    function isStaff() {
+      return isAuthenticated() && (getUserRole() == 'admin' || getUserRole() == 'employee');
+    }
+    
+    // Sjekk om bruker er forelder til et spesifikt barn
+    function isParentOfChild(childId) {
+      return isParent() && 
+             get(/databases/$(database)/documents/children/$(childId)).data.parentIds.hasAny([request.auth.uid]);
+    }
+    
+    // Sjekk om barn tilhører ansattes avdeling
+    function isChildInEmployeeDepartment(childId) {
+      return isEmployee() && 
+             get(/databases/$(database)/documents/children/$(childId)).data.department == getUserDepartment();
+    }
+    
+    // ============================================
+    // USERS COLLECTION
+    // ============================================
+    
+    match /users/{userId} {
+      // Bruker kan lese sin egen profil
+      allow read: if isAuthenticated() && request.auth.uid == userId;
+      
+      // Admin kan lese alle brukere (for søk og administrasjon)
+      allow read: if isAdmin();
+      
+      // Bruker kan oppdatere sin egen profil, men ikke endre rolle
+      allow update: if isAuthenticated() 
+        && request.auth.uid == userId
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role']));
+      
+      // Admin kan oppdatere alle brukere, men ikke gi admin-rolle til andre
+      allow update: if isAdmin()
+        && (
+          // Hvis rolle ikke endres, tillat
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role'])
+          ||
+          // Hvis rolle endres, sjekk at den nye rollen ikke er 'admin' (med mindre brukeren allerede var admin)
+          (request.resource.data.role != 'admin' && resource.data.role != 'admin')
+          ||
+          (request.resource.data.role == 'admin' && resource.data.role == 'admin')
+        );
+      
+      // Nye brukere kan opprette sitt eget dokument (ved registrering)
+      // De kan kun opprette dokumentet med sin egen userId og kun med rolle 'parent'
+      allow create: if isAuthenticated() 
+        && request.auth.uid == userId
+        && request.resource.data.role == 'parent'
+        && !exists(/databases/$(database)/documents/users/$(userId));
+      
+      // Admin kan også opprette nye brukere, men ikke med admin-rolle
+      allow create: if isAdmin() && request.resource.data.role != 'admin';
+      
+      // Kun admin kan slette brukere
+      allow delete: if isAdmin();
+    }
+    
+    // ============================================
+    // CHILDREN COLLECTION
+    // ============================================
+    
+    match /children/{childId} {
+      // Admin kan se alle barn
+      allow read: if isAdmin();
+      
+      // Employee kan se barn i egen avdeling
+      allow read: if isEmployee() 
+        && resource.data.department == getUserDepartment();
+      
+      // Parent kan se egne barn (sjekker parentIds array)
+      allow read: if isParent() 
+        && resource.data.parentIds.hasAny([request.auth.uid]);
+      
+      // Kun admin kan opprette, oppdatere eller slette barn
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // ============================================
+    // CHECKINOUTLOGS COLLECTION
+    // ============================================
+    
+    match /checkInOutLogs/{logId} {
+      // Admin kan se alle logger
+      allow read: if isAdmin();
+      
+      // Employee kan se logger for barn i egen avdeling
+      allow read: if isEmployee() 
+        && get(/databases/$(database)/documents/children/$(resource.data.childId)).data.department == getUserDepartment();
+      
+      // Parent kan se logger for egne barn
+      allow read: if isParent() 
+        && get(/databases/$(database)/documents/children/$(resource.data.childId)).data.parentIds.hasAny([request.auth.uid]);
+      
+      // Admin og employee kan opprette logger
+      allow create: if isAdmin() || isEmployee();
+      
+      // Kun admin kan oppdatere eller slette logger
+      allow update, delete: if isAdmin();
+    }
+    
+    // ============================================
+    // CHILDACTIVITIES COLLECTION
+    // ============================================
+    
+    match /childActivities/{activityId} {
+      // Admin kan se alle aktiviteter
+      allow read: if isAdmin();
+      
+      // Employee kan se aktiviteter for barn i egen avdeling
+      allow read: if isEmployee() 
+        && get(/databases/$(database)/documents/children/$(resource.data.childId)).data.department == getUserDepartment();
+      
+      // Parent kan se aktiviteter for egne barn
+      allow read: if isParent() 
+        && get(/databases/$(database)/documents/children/$(resource.data.childId)).data.parentIds.hasAny([request.auth.uid]);
+      
+      // Admin og employee kan opprette aktiviteter
+      allow create: if isAdmin() || isEmployee();
+      
+      // Kun admin kan oppdatere eller slette aktiviteter
+      allow update, delete: if isAdmin();
+    }
+    
+    // ============================================
+    // CONSENTFORMS COLLECTION
+    // ============================================
+    
+    match /consentForms/{consentId} {
+      // Admin kan se, opprette, oppdatere og slette alle samtykkeskjemaer
+      allow read, write, delete: if isAdmin();
+      
+      // Employee kan lese samtykkeskjemaer for barn i egen avdeling
+      allow read: if isEmployee() 
+        && get(/databases/$(database)/documents/children/$(resource.data.childId)).data.department == getUserDepartment();
+      
+      // Parent kan lese og oppdatere samtykkeskjemaer for egne barn
+      allow read, update: if isParent() 
+        && get(/databases/$(database)/documents/children/$(resource.data.childId)).data.parentIds.hasAny([request.auth.uid]);
+      
+      // Parent kan opprette samtykkeskjemaer for egne barn
+      allow create: if isParent() 
+        && get(/databases/$(database)/documents/children/$(request.resource.data.childId)).data.parentIds.hasAny([request.auth.uid]);
+    }
+    
+    // ============================================
+    // CALENDAREVENTS COLLECTION
+    // ============================================
+    
+    match /calendarEvents/{eventId} {
+      // Alle autentiserte brukere kan lese kalenderhendelser
+      allow read: if isAuthenticated();
+      
+      // Kun admin kan opprette, oppdatere eller slette kalenderhendelser
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // ============================================
+    // PHOTOALBUMS COLLECTION
+    // ============================================
+    
+    match /photoAlbums/{albumId} {
+      // Admin kan se alle album
+      allow read: if isAdmin();
+      
+      // Employee kan se album for egen avdeling
+      allow read: if isEmployee() 
+        && resource.data.department == getUserDepartment();
+      
+      // Parent kan se alle album (for å se bilder fra barnehagen)
+      allow read: if isParent();
+      
+      // Admin og employee kan opprette album
+      allow create: if isAdmin() || isEmployee();
+      
+      // Kun admin kan oppdatere eller slette album
+      allow update, delete: if isAdmin();
+    }
+    
+    // ============================================
+    // PHOTOS COLLECTION
+    // ============================================
+    
+    match /photos/{photoId} {
+      // Admin kan se alle bilder
+      allow read: if isAdmin();
+      
+      // Employee kan se bilder i album for egen avdeling
+      allow read: if isEmployee() 
+        && get(/databases/$(database)/documents/photoAlbums/$(resource.data.albumId)).data.department == getUserDepartment();
+      
+      // Parent kan se alle bilder (for å se bilder fra barnehagen)
+      // MERK: I produksjon bør du sjekke samtykkeskjema før visning
+      allow read: if isParent();
+      
+      // Admin og employee kan opprette (laste opp) bilder
+      allow create: if isAdmin() || isEmployee();
+      
+      // Admin og employee kan oppdatere bildmetadata (f.eks. beskrivelse, tags)
+      // MERK: Dette endrer kun Firestore-dokumentet, ikke selve bildet i Storage
+      allow update: if isAdmin() || isEmployee();
+      
+      // Admin og employee kan slette bilder (for GDPR-compliance)
+      allow delete: if isAdmin() || isEmployee();
+    }
+    
+    // ============================================
+    // DEPARTMENTS COLLECTION
+    // ============================================
+    
+    match /departments/{departmentId} {
+      // Alle autentiserte brukere kan lese avdelinger (for dropdown-lister)
+      allow read: if isAuthenticated();
+      
+      // Kun admin kan opprette, oppdatere eller slette avdelinger
+      allow create, update, delete: if isAdmin();
+    }
+    
+    // ============================================
+    // DEFAULT: NEKT ALLE ANDRE COLLECTIONS
+    // ============================================
+    
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

@@ -1,0 +1,40 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Bakgrunn med avrundede hjørner -->
+  <rect width="512" height="512" rx="120" fill="#1e1b4b"/>
+  
+  <!-- Spiral/bølge i lilla-blå -->
+  <path d="M256 100 C200 100, 150 150, 150 200 C150 250, 200 300, 256 300 C312 300, 362 250, 362 200 C362 150, 312 100, 256 100 Z" 
+        fill="url(#spiralGradient)" 
+        opacity="0.9"/>
+  
+  <!-- Ytterligere spiral-lag for dybde -->
+  <path d="M256 150 C220 150, 190 180, 190 210 C190 240, 220 270, 256 270 C292 270, 322 240, 322 210 C322 180, 292 150, 256 150 Z" 
+        fill="url(#spiralGradient2)" 
+        opacity="0.7"/>
+  
+  <!-- Sentral spiral -->
+  <circle cx="256" cy="200" r="40" fill="url(#centerGradient)"/>
+  
+  <!-- Akksent-stjerne i lys grønn -->
+  <path d="M256 160 L260 175 L275 175 L263 185 L268 200 L256 190 L244 200 L249 185 L237 175 L252 175 Z" 
+        fill="#10b981" 
+        opacity="0.8"/>
+  
+  <!-- Gradient definisjoner -->
+  <defs>
+    <linearGradient id="spiralGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#818cf8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#a5b4fc;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="spiralGradient2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#818cf8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#c7d2fe;stop-opacity:1" />
+    </linearGradient>
+    <radialGradient id="centerGradient" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#a5b4fc;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6366f1;stop-opacity:1" />
+    </radialGradient>
+  </defs>
+</svg>
+

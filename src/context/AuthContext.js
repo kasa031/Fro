@@ -1,7 +1,9 @@
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { createContext, useContext, useEffect, useState } from 'react';
-import { auth, db } from '../config/firebaseconfig';
+import { Platform } from 'react-native';
+import { auth, db } from '../config/firebaseConfig';
+import { initializeMessaging, registerFCMToken, unregisterFCMToken, setupMessageListener } from '../services/NotificationService';
 
 const AuthContext = createContext();
 
@@ -22,8 +24,41 @@ export const AuthProvider = ({ children }) => {
           if (userDoc.exists()) {
             setRole(userDoc.data().role);
           } else {
-            // Standard fallback hvis ingen rolle er satt
-            setRole('parent'); 
+            // Hvis brukeren eksisterer i Firebase Auth men ikke i Firestore,
+            // opprett et dokument med standard rolle 'parent'
+            console.log('Bruker mangler i Firestore, oppretter dokument...');
+            try {
+              await setDoc(doc(db, "users", currentUser.uid), {
+                email: currentUser.email || '',
+                name: currentUser.displayName || currentUser.email || 'Bruker',
+                role: 'parent',
+                createdAt: serverTimestamp(),
+                updatedAt: serverTimestamp(),
+              });
+              setRole('parent');
+              console.log('Brukerdokument opprettet i Firestore');
+            } catch (createError) {
+              console.error('Kunne ikke opprette brukerdokument:', createError);
+              setRole('parent'); // Fallback
+            }
+          }
+          
+          // Initialiser push-varsler (kun for web)
+          // MERK: Dette feiler stille hvis service worker ikke er tilgjengelig
+          if (typeof window !== 'undefined' && Platform.OS === 'web') {
+            // Kjør asynkront uten å vente - ikke blokker innlogging
+            (async () => {
+              try {
+                await initializeMessaging();
+                await registerFCMToken(currentUser.uid);
+                setupMessageListener((payload) => {
+                  console.log('Push-varsel mottatt:', payload);
+                });
+              } catch (error) {
+                // Ignorer FCM-feil stille - appen skal fungere uten push-varsler
+                // Feilene vises kun i development console
+              }
+            })();
           }
         } catch (error) {
           console.error("Kunne ikke hente rolle:", error);
@@ -32,6 +67,9 @@ export const AuthProvider = ({ children }) => {
       } else {
         setUser(null);
         setRole(null);
+        
+        // Fjern FCM token ved utlogging (hvis bruker var logget inn)
+        // Dette håndteres i logout-funksjonen i stedet
       }
       setLoading(false);
     });
@@ -43,7 +81,15 @@ export const AuthProvider = ({ children }) => {
     return signInWithEmailAndPassword(auth, email, password);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    // Fjern FCM token før utlogging
+    if (user && typeof window !== 'undefined' && Platform.OS === 'web') {
+      try {
+        await unregisterFCMToken(user.uid);
+      } catch (error) {
+        console.error('Feil ved fjerning av FCM token:', error);
+      }
+    }
     return signOut(auth);
   };
 

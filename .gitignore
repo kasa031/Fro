@@ -31,7 +31,25 @@ yarn-error.*
 *.pem
 
 # local env files
+.env
 .env*.local
+.env.development
+.env.production
+.env.test
+
+# Firebase config (sikkerhet)
+firebase-config.js
+firebase.json
+.firebaserc
+
+# Secrets og nøkler
+*.key
+*.pem
+secrets/
+config/secrets.js
+
+# Firebase service worker (inneholder API-nøkler)
+public/firebase-messaging-sw.js
 
 # typescript
 *.tsbuildinfo
@@ -42,4 +60,25 @@ app-example
 /ios
 /android
 
-.env
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+.vercel
+
+# Interne dokumentasjonsfiler (ikke nødvendig for andre)
+RYDDING_OPPSUMMERING.md
+DEPLOYMENT_STATUS.md
+GITHUB_SECURITY_STATUS.md
+SECURITY_SETUP_GUIDE.md
+FOR_PUSH_SJEKLISTE.md
+SJEKK_ENV_FOR_COMMIT.md
+PUSH_MANUELL.md
+PUSH_NÅ.ps1
+KJOR_FOR_PUSH.ps1
+GITHUB_DESCRIPTION.txt
+.git-safety-check.md
