@@ -501,6 +501,18 @@ export default function AdminScreen() {
     }
   };
 
+  // Validerer passord mot Firebase-krav
+  const validatePassword = (password) => {
+    if (password.length < 6) {
+      return 'Passord må være minst 6 tegn';
+    }
+    // Sjekk om passordet inneholder minst ett ikke-alfanumerisk tegn (spesialtegn)
+    if (!/[^a-zA-Z0-9]/.test(password)) {
+      return 'Passord må inneholde minst ett spesialtegn (!@#$%^&*()_+-=[]{}|;:,.<>?)';
+    }
+    return null; // Passordet er gyldig
+  };
+
   /**
    * Oppretter en ny bruker i Firebase Authentication og Firestore
    * Validerer at alle felt er utfylt og at rolle er gyldig
@@ -522,6 +534,12 @@ export default function AdminScreen() {
 
     if (newUserRole === 'admin') {
       Alert.alert(t('common.error'), t('userManagement.cannotCreateAdmin'));
+      return;
+    }
+
+    const passwordError = validatePassword(newUserPassword);
+    if (passwordError) {
+      Alert.alert(t('common.error'), passwordError);
       return;
     }
 
@@ -570,8 +588,8 @@ export default function AdminScreen() {
       let errorMessage = 'Kunne ikke opprette bruker.';
       if (error.code === 'auth/email-already-in-use') {
         errorMessage = t('userManagement.emailAlreadyInUse');
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = t('userManagement.passwordTooWeak');
+      } else if (error.code === 'auth/weak-password' || error.message?.includes('password') || error.message?.includes('requirements')) {
+        errorMessage = 'Passordet oppfyller ikke kravene. Passord må være minst 6 tegn og inneholde minst ett spesialtegn (!@#$%^&*()_+-=[]{}|;:,.<>?).';
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = t('userManagement.invalidEmail');
       }

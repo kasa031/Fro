@@ -153,11 +153,18 @@ export const registerFCMToken = async (userId) => {
       return null;
     }
     
-    // Ignorer andre FCM-feil stille i development
+    // Ignorer alle FCM-feil stille (både development og production)
+    // FCM er valgfritt - appen skal fungere uten push-notifikasjoner
     if (__DEV__) {
+      // I development, log kun hvis det er en uventet feil
+      if (!error.message?.includes('push service') && 
+          !error.message?.includes('Registration failed') &&
+          !error.code) {
+        console.log('FCM ikke tilgjengelig (forventet i development)');
+      }
       return null;
     }
-    console.error('FCM token registration error:', error.message || error.code);
+    // I production, ignorer også stille - ikke forstyrr brukeropplevelsen
     return null;
   }
 };

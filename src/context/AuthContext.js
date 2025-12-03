@@ -42,27 +42,45 @@ export const AuthProvider = ({ children }) => {
               setRole('parent'); // Fallback
             }
           }
-          
-          // Initialiser push-varsler (kun for web)
-          // MERK: Dette feiler stille hvis service worker ikke er tilgjengelig
-          if (typeof window !== 'undefined' && Platform.OS === 'web') {
-            // Kjør asynkront uten å vente - ikke blokker innlogging
-            (async () => {
-              try {
-                await initializeMessaging();
-                await registerFCMToken(currentUser.uid);
-                setupMessageListener((payload) => {
-                  console.log('Push-varsel mottatt:', payload);
-                });
-              } catch (error) {
-                // Ignorer FCM-feil stille - appen skal fungere uten push-varsler
-                // Feilene vises kun i development console
-              }
-            })();
-          }
         } catch (error) {
           console.error("Kunne ikke hente rolle:", error);
-          setRole('parent');
+          
+          // Håndter ERR_BLOCKED_BY_CLIENT (ad-blocker blokkerer Firestore)
+          if (error.message?.includes('ERR_BLOCKED_BY_CLIENT') || 
+              error.message?.includes('blocked') ||
+              error.code === 'unavailable') {
+            console.warn('⚠️ Firestore er blokkert (sannsynligvis ad-blocker). Bruker fallback-rolle.');
+            
+            // Fallback: Sjekk e-post for å bestemme rolle
+            const email = currentUser.email?.toLowerCase() || '';
+            if (email.includes('admin') || email === 'admin@barnehagen.no') {
+              setRole('admin');
+              console.log('Fallback: Bruker admin-rolle basert på e-post');
+            } else {
+              setRole('parent'); // Standard fallback
+              console.log('Fallback: Bruker parent-rolle');
+            }
+          } else {
+            setRole('parent'); // Standard fallback for andre feil
+          }
+        }
+        
+        // Initialiser push-varsler (kun for web)
+        // MERK: Dette feiler stille hvis service worker ikke er tilgjengelig
+        if (typeof window !== 'undefined' && Platform.OS === 'web') {
+          // Kjør asynkront uten å vente - ikke blokker innlogging
+          (async () => {
+            try {
+              await initializeMessaging();
+              await registerFCMToken(currentUser.uid);
+              setupMessageListener((payload) => {
+                console.log('Push-varsel mottatt:', payload);
+              });
+            } catch (error) {
+              // Ignorer FCM-feil stille - appen skal fungere uten push-varsler
+              // Feilene vises kun i development console
+            }
+          })();
         }
       } else {
         setUser(null);

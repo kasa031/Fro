@@ -263,7 +263,7 @@
     "passwordTooWeak": "Hasło jest zbyt słabe",
     "passwordTooShort": "Hasło musi mieć co najmniej 6 znaków",
     "passwordsDoNotMatch": "Hasła nie pasują",
-    "passwordRequirements": "Hasło musi mieć co najmniej 6 znaków",
+    "passwordRequirements": "Hasło musi mieć co najmniej 6 znaków i zawierać co najmniej jeden znak specjalny (!@#$%^&*()_+-=[]{}|;:,.<>?)",
     "allFieldsRequired": "Wszystkie pola są wymagane",
     "nameRequired": "Nazwa jest wymagana",
     "invalidEmail": "Nieprawidłowy adres e-mail",

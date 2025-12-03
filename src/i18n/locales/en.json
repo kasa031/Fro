@@ -271,7 +271,7 @@
     "passwordTooWeak": "Password is too weak",
     "passwordTooShort": "Password must be at least 6 characters",
     "passwordsDoNotMatch": "Passwords do not match",
-    "passwordRequirements": "Password must be at least 6 characters long",
+    "passwordRequirements": "Password must be at least 6 characters and contain at least one special character (!@#$%^&*()_+-=[]{}|;:,.<>?)",
     "allFieldsRequired": "All fields are required",
     "nameRequired": "Name is required",
     "invalidEmail": "Invalid email address",

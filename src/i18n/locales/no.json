@@ -336,7 +336,7 @@
     "passwordTooWeak": "Passordet er for svakt",
     "passwordTooShort": "Passordet må være minst 6 tegn",
     "passwordsDoNotMatch": "Passordene stemmer ikke overens",
-    "passwordRequirements": "Passordet må være minst 6 tegn langt",
+    "passwordRequirements": "Passord må være minst 6 tegn og inneholde minst ett spesialtegn (!@#$%^&*()_+-=[]{}|;:,.<>?)",
     "allFieldsRequired": "Alle felt må fylles ut",
     "nameRequired": "Navn er påkrevd",
     "invalidEmail": "Ugyldig e-postadresse",

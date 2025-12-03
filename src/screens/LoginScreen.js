@@ -111,13 +111,26 @@ export default function LoginScreen() {
     }
   };
 
+  // Validerer passord mot Firebase-krav
+  const validatePassword = (password) => {
+    if (password.length < 6) {
+      return 'Passord må være minst 6 tegn';
+    }
+    // Sjekk om passordet inneholder minst ett ikke-alfanumerisk tegn (spesialtegn)
+    if (!/[^a-zA-Z0-9]/.test(password)) {
+      return 'Passord må inneholde minst ett spesialtegn (!@#$%^&*()_+-=[]{}|;:,.<>?)';
+    }
+    return null; // Passordet er gyldig
+  };
+
   const handleSignUp = async () => {
     if(!email || !password || !signUpName) {
       Alert.alert(t('common.error'), 'Alle felt må fylles ut');
       return;
     }
-    if(password.length < 6) {
-      Alert.alert(t('common.error'), 'Passord må være minst 6 tegn');
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      Alert.alert(t('common.error'), passwordError);
       return;
     }
     setLoading(true);
@@ -147,8 +160,8 @@ export default function LoginScreen() {
       } else if (error.code === 'permission-denied' || error.message?.includes('insufficient') || error.message?.includes('authority')) {
         errorMessage = 'Manglende tilgang. Kontakt administrator for å opprette bruker.';
         console.error('Firebase Security Rules feil:', error);
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = 'Passordet er for svakt. Må være minst 6 tegn.';
+      } else if (error.code === 'auth/weak-password' || error.message?.includes('password') || error.message?.includes('requirements')) {
+        errorMessage = 'Passordet oppfyller ikke kravene. Passord må være minst 6 tegn og inneholde minst ett spesialtegn (!@#$%^&*()_+-=[]{}|;:,.<>?).';
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = 'Ugyldig e-postadresse';
       } else if (error.message) {
@@ -252,14 +265,19 @@ export default function LoginScreen() {
           />
 
           {showSignUp && (
-            <TextInput 
-              placeholder="Navn" 
-              style={styles.input} 
-              value={signUpName}
-              onChangeText={setSignUpName}
-              returnKeyType="done"
-              onSubmitEditing={handleSignUp}
-            />
+            <View>
+              <TextInput 
+                placeholder="Navn" 
+                style={styles.input} 
+                value={signUpName}
+                onChangeText={setSignUpName}
+                returnKeyType="next"
+                onSubmitEditing={() => passwordInputRef.current?.focus()}
+              />
+              <Text style={styles.helpText}>
+                {'Passord må være minst 6 tegn og inneholde minst ett spesialtegn (!@#$%^&*()_+-=[]{}|;:,.<>?)'}
+              </Text>
+            </View>
           )}
 
           <TouchableOpacity 
@@ -400,5 +418,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     textDecorationLine: 'underline'
+  },
+  helpText: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: -8,
+    marginBottom: 12,
+    textAlign: 'left',
+    width: '100%',
+    paddingHorizontal: 4
   }
 });

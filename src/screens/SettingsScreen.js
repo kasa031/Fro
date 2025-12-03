@@ -95,14 +95,27 @@ export default function SettingsScreen() {
     }
   }, []);
 
+  // Validerer passord mot Firebase-krav
+  const validatePassword = (password) => {
+    if (password.length < 6) {
+      return 'Passord må være minst 6 tegn';
+    }
+    // Sjekk om passordet inneholder minst ett ikke-alfanumerisk tegn (spesialtegn)
+    if (!/[^a-zA-Z0-9]/.test(password)) {
+      return 'Passord må inneholde minst ett spesialtegn (!@#$%^&*()_+-=[]{}|;:,.<>?)';
+    }
+    return null; // Passordet er gyldig
+  };
+
   const handleChangePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       Alert.alert(t('common.error'), t('settings.allFieldsRequired'));
       return;
     }
 
-    if (newPassword.length < 6) {
-      Alert.alert(t('common.error'), t('settings.passwordTooShort'));
+    const passwordError = validatePassword(newPassword);
+    if (passwordError) {
+      Alert.alert(t('common.error'), passwordError);
       return;
     }
 
@@ -137,8 +150,8 @@ export default function SettingsScreen() {
       
       if (error.code === 'auth/wrong-password') {
         errorMessage = t('settings.wrongCurrentPassword');
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = t('settings.passwordTooWeak');
+      } else if (error.code === 'auth/weak-password' || error.message?.includes('password') || error.message?.includes('requirements')) {
+        errorMessage = 'Passordet oppfyller ikke kravene. Passord må være minst 6 tegn og inneholde minst ett spesialtegn (!@#$%^&*()_+-=[]{}|;:,.<>?).';
       }
       
       if (Platform.OS === 'web') {
