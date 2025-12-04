@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, Keyboard, Pressable } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation } from 'react-i18next';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -45,50 +45,77 @@ export default function LoginScreen() {
       return;
     }
 
-    // For web - håndter beforeinstallprompt event
+    // For web - håndter beforeinstallprompt event (forbedret PWA install prompt)
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const handler = (e) => {
-        // Forhindre at standard prompt vises
+        // Forhindre at standard prompt vises automatisk
         e.preventDefault();
         // Lagre event for senere bruk
         setDeferredPrompt(e);
         setShowInstallButton(true);
+        console.log('📱 PWA install prompt tilgjengelig');
       };
 
       window.addEventListener('beforeinstallprompt', handler);
       
       // Håndter appinstalled event
       const installedHandler = () => {
+        console.log('✅ PWA installert');
         setDeferredPrompt(null);
         setShowInstallButton(false);
+        // Vis suksessmelding
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert('Appen er installert! Du kan nå åpne den fra hjemmeskjermen.');
+        }
       };
       window.addEventListener('appinstalled', installedHandler);
+
+      // Sjekk periodisk om install prompt er tilgjengelig (hvis den ikke kom automatisk)
+      const checkInterval = setInterval(() => {
+        if (!showInstallButton && !isStandalone()) {
+          // Prøv å trigge install prompt hvis den ikke har kommet
+          // Dette hjelper på nettlesere som ikke trigger beforeinstallprompt umiddelbart
+        }
+      }, 5000);
 
       return () => {
         window.removeEventListener('beforeinstallprompt', handler);
         window.removeEventListener('appinstalled', installedHandler);
+        clearInterval(checkInterval);
       };
     }
   }, []);
 
   const handleLogin = async () => {
-    console.log('handleLogin kalt');
-    if(!email || !password) {
+    try {
+      console.log('=== handleLogin START ===');
+      console.log('Email:', email);
+      console.log('Password length:', password?.length || 0);
+      
+      // Lukk keyboard
+      Keyboard.dismiss();
+      
+      if(!email || !password) {
+        console.log('Mangler email eller password');
         Alert.alert(t('common.error'), t('auth.fillAllFields'));
         return;
-    }
-    setLoading(true);
-    try {
+      }
+      
+      setLoading(true);
       console.log('Prøver å logge inn med:', email);
       console.log('Firebase config check:', {
         apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY ? '✓' : '✗',
         projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID ? '✓' : '✗'
       });
+      
       await login(email, password);
       console.log('Innlogging vellykket');
     } catch (error) {
-      console.error('Innloggingsfeil:', error);
-      console.error('Feilkode:', error.code);
+      console.error('=== INNLOGGINGSFEIL ===');
+      console.error('Error:', error);
+      console.error('Error code:', error.code);
+      console.error('Error message:', error.message);
+      
       let errorMessage = t('auth.checkCredentials');
       
       if (error.code === 'auth/invalid-email') {
@@ -108,6 +135,7 @@ export default function LoginScreen() {
       Alert.alert(t('auth.loginFailed'), errorMessage);
     } finally {
       setLoading(false);
+      console.log('=== handleLogin FERDIG ===');
     }
   };
 
@@ -231,6 +259,7 @@ export default function LoginScreen() {
         showsVerticalScrollIndicator={false}
         bounces={false}
         scrollEnabled={true}
+        nestedScrollEnabled={true}
       >
         <View style={styles.card}>
           <Image 
@@ -240,68 +269,142 @@ export default function LoginScreen() {
           />
           <Text style={styles.subtitle}>{t('auth.loginToContinue')}</Text>
           
-          <TextInput 
-            placeholder={t('auth.email')} 
-            style={styles.input} 
-            autoCapitalize="none"
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-            returnKeyType="next"
-            onSubmitEditing={() => {
-              // Fokus på passord-feltet når bruker trykker "next"
-              passwordInputRef.current?.focus();
-            }}
-          />
-          <TextInput 
-            ref={passwordInputRef}
-            placeholder={t('auth.password')} 
-            style={styles.input} 
-            secureTextEntry
-            value={password}
-            onChangeText={setPassword}
-            returnKeyType="done"
-            onSubmitEditing={showSignUp ? handleSignUp : handleLogin}
-          />
-
-          {showSignUp && (
-            <View>
+          {Platform.OS === 'web' ? (
+            <form 
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (showSignUp) {
+                  handleSignUp();
+                } else {
+                  handleLogin();
+                }
+              }}
+              style={{ width: '100%' }}
+            >
               <TextInput 
-                placeholder="Navn" 
+                placeholder={t('auth.email')} 
                 style={styles.input} 
-                value={signUpName}
-                onChangeText={setSignUpName}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                value={email}
+                onChangeText={setEmail}
                 returnKeyType="next"
-                onSubmitEditing={() => passwordInputRef.current?.focus()}
+                onSubmitEditing={() => {
+                  passwordInputRef.current?.focus();
+                }}
               />
-              <Text style={styles.helpText}>
-                {'Passord må være minst 6 tegn og inneholde minst ett spesialtegn (!@#$%^&*()_+-=[]{}|;:,.<>?)'}
-              </Text>
-            </View>
+              <TextInput 
+                ref={passwordInputRef}
+                placeholder={t('auth.password')} 
+                style={styles.input} 
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+                returnKeyType="done"
+                onSubmitEditing={showSignUp ? handleSignUp : handleLogin}
+              />
+              {showSignUp && (
+                <>
+                  <TextInput 
+                    placeholder="Navn" 
+                    style={styles.input} 
+                    value={signUpName}
+                    onChangeText={setSignUpName}
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordInputRef.current?.focus()}
+                  />
+                  <Text style={styles.helpText}>
+                    {'Passord må være minst 6 tegn og inneholde minst ett spesialtegn (!@#$%^&*()_+-=[]{}|;:,.<>?)'}
+                  </Text>
+                </>
+              )}
+            </form>
+          ) : (
+            <>
+              <TextInput 
+                placeholder={t('auth.email')} 
+                style={styles.input} 
+                autoCapitalize="none"
+                keyboardType="email-address"
+                value={email}
+                onChangeText={setEmail}
+                returnKeyType="next"
+                onSubmitEditing={() => {
+                  passwordInputRef.current?.focus();
+                }}
+              />
+              <TextInput 
+                ref={passwordInputRef}
+                placeholder={t('auth.password')} 
+                style={styles.input} 
+                secureTextEntry
+                value={password}
+                onChangeText={setPassword}
+                returnKeyType="done"
+                onSubmitEditing={showSignUp ? handleSignUp : handleLogin}
+              />
+              {showSignUp && (
+                <>
+                  <TextInput 
+                    placeholder="Navn" 
+                    style={styles.input} 
+                    value={signUpName}
+                    onChangeText={setSignUpName}
+                    returnKeyType="next"
+                    onSubmitEditing={() => passwordInputRef.current?.focus()}
+                  />
+                  <Text style={styles.helpText}>
+                    {'Passord må være minst 6 tegn og inneholde minst ett spesialtegn (!@#$%^&*()_+-=[]{}|;:,.<>?)'}
+                  </Text>
+                </>
+              )}
+            </>
           )}
 
-          <TouchableOpacity 
-            style={[styles.button, loading && styles.buttonDisabled]} 
+          <Pressable 
+            style={({ pressed }) => [
+              styles.button, 
+              loading && styles.buttonDisabled,
+              pressed && styles.buttonPressed
+            ]} 
             onPress={() => {
-              console.log('=== KNAPP TRYKKET ===');
-              console.log('showSignUp:', showSignUp);
-              console.log('loading:', loading);
-              if (showSignUp) {
-                handleSignUp();
-              } else {
-                handleLogin();
+              try {
+                console.log('=== KNAPP TRYKKET ===');
+                console.log('showSignUp:', showSignUp);
+                console.log('loading:', loading);
+                console.log('email:', email);
+                console.log('password length:', password?.length || 0);
+                
+                // Lukk keyboard først
+                Keyboard.dismiss();
+                
+                if (loading) {
+                  console.log('Knappen er disabled (loading)');
+                  return;
+                }
+                
+                if (showSignUp) {
+                  console.log('Kaller handleSignUp');
+                  handleSignUp();
+                } else {
+                  console.log('Kaller handleLogin');
+                  handleLogin();
+                }
+              } catch (error) {
+                console.error('=== FEIL I ONPRESS ===');
+                console.error('Error:', error);
+                Alert.alert('Feil', 'Noe gikk galt. Prøv igjen.');
               }
             }} 
             disabled={loading}
-            activeOpacity={0.6}
-            hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
             {loading ? (
               <ActivityIndicator color="#fff" size="small" />
             ) : (
               <Text style={styles.btnText}>{showSignUp ? 'Opprett bruker' : t('auth.login')}</Text>
             )}
-          </TouchableOpacity>
+          </Pressable>
 
           <TouchableOpacity 
             style={styles.linkButton}
@@ -343,18 +446,23 @@ const styles = StyleSheet.create({
   card: { 
     backgroundColor: 'white', 
     borderRadius: 20, 
-    padding: 24, 
+    padding: Platform.OS === 'web' ? 24 : 20, 
     elevation: 5, 
     alignItems: 'center',
     width: '100%',
-    maxWidth: 400,
-    alignSelf: 'center'
+    maxWidth: Platform.OS === 'web' ? 400 : '100%',
+    alignSelf: 'center',
+    // Responsiv padding for mobile
+    ...(Platform.OS !== 'web' && { paddingHorizontal: 16 })
   },
   logo: { 
-    width: 300, 
-    height: 300, 
+    width: Platform.OS === 'web' ? 300 : 250, 
+    height: Platform.OS === 'web' ? 300 : 250, 
     marginBottom: 16, 
-    borderRadius: 0 
+    borderRadius: 0,
+    // Responsiv størrelse for små skjermer
+    maxWidth: '100%',
+    maxHeight: '40%'
   },
   subtitle: { 
     textAlign: 'center', 
@@ -388,6 +496,10 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.6
+  },
+  buttonPressed: {
+    opacity: 0.8,
+    transform: [{ scale: 0.98 }]
   },
   btnText: { 
     color: 'white', 

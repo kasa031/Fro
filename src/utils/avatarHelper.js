@@ -27,9 +27,10 @@ export const getAvatarUrl = (name, type = 'child', size = 200) => {
   // Generer URL med DiceBear API for faktiske ansikter
   // radius: 50 gir runde ansikter
   // backgroundColor: varierer basert på type
+  // Bruker PNG i stedet for SVG for bedre kompatibilitet med React Native
   const backgroundColor = type === 'child' ? '6366f1' : type === 'user' ? '10b981' : '3b82f6';
   
-  return `https://api.dicebear.com/7.x/${style}/svg?seed=${seed}&size=${size}&radius=50&backgroundColor=${backgroundColor}`;
+  return `https://api.dicebear.com/7.x/${style}/png?seed=${seed}&size=${size}&radius=50&backgroundColor=${backgroundColor}`;
 };
 
 /**

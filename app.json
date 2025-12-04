@@ -27,12 +27,15 @@
       "themeColor": "#6366f1",
       "backgroundColor": "#1e1b4b",
       "display": "standalone",
+      "display_override": ["standalone", "fullscreen", "minimal-ui"],
       "startUrl": "/",
       "scope": "/",
       "orientation": "portrait",
+      "dir": "ltr",
+      "lang": "no",
       "apple": {
         "appleTouchIcon": "./assets/images/icon.png",
-        "appleStatusBarStyle": "default"
+        "appleStatusBarStyle": "black-translucent"
       },
       "manifest": {
         "icons": [
@@ -62,7 +65,10 @@
               }
             ]
           }
-        ]
+        ],
+        "categories": ["productivity", "education"],
+        "screenshots": [],
+        "prefer_related_applications": false
       }
     },
     "plugins": [

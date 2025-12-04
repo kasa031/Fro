@@ -44,6 +44,7 @@ export default function EmployeeScreen() {
   const [children, setChildren] = useState([]);
   const [loadingChildren, setLoadingChildren] = useState(true);
   const [checkingInOut, setCheckingInOut] = useState(false);
+  const [failedAvatars, setFailedAvatars] = useState(new Set()); // Sporer avatarene som har feilet
   const [showLanguageMenu, setShowLanguageMenu] = useState(false);
   const [showOptionsMenu, setShowOptionsMenu] = useState(false);
 
@@ -353,10 +354,21 @@ export default function EmployeeScreen() {
                   <View style={styles.childCardHeader}>
                     <View style={styles.childInfo}>
                       <View style={styles.childInfoRow}>
-                        <Image 
-                          source={{ uri: getAvatar(child.imageUrl, child.name, 'child', 200) }} 
-                          style={styles.childAvatar}
-                        />
+                        <View style={[styles.childAvatarContainer || { position: 'relative', width: 50, height: 50 }]}>
+                          <View style={[styles.childAvatar, { backgroundColor: '#4f46e5', justifyContent: 'center', alignItems: 'center', position: 'absolute', top: 0, left: 0 }]}>
+                            <Text style={{ fontSize: 30 }}>👶</Text>
+                          </View>
+                          {!failedAvatars.has(child.id) && (
+                            <Image 
+                              source={{ uri: getAvatar(child.imageUrl, child.name, 'child', 200) }} 
+                              style={[styles.childAvatar, { position: 'absolute', top: 0, left: 0 }]}
+                              onError={() => {
+                                console.log('Avatar failed to load for:', child.name);
+                                setFailedAvatars(prev => new Set(prev).add(child.id));
+                              }}
+                            />
+                          )}
+                        </View>
                         <View style={styles.childNameContainer}>
                           <Text style={styles.childName}>{child.name || 'Ingen navn'}</Text>
                           <Text style={styles.childDepartment}>{child.department || 'Ingen avdeling'}</Text>

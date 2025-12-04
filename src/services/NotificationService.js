@@ -171,17 +171,47 @@ export const registerFCMToken = async (userId) => {
 
 /**
  * Fjerner FCM token for bruker
+ * Håndterer Firestore-blokkering elegant - feiler stille hvis Firestore er blokkert
  */
 export const unregisterFCMToken = async (userId) => {
+  if (!userId) {
+    return;
+  }
+
   try {
+    // Timeout for Firestore-operasjon (3 sekunder)
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Firestore timeout')), 3000)
+    );
+
     const userRef = doc(db, 'users', userId);
-    await updateDoc(userRef, {
-      fcmToken: null,
-      fcmTokenUpdatedAt: null,
-    });
-    console.log('FCM token fjernet');
+    await Promise.race([
+      updateDoc(userRef, {
+        fcmToken: null,
+        fcmTokenUpdatedAt: null,
+      }),
+      timeoutPromise
+    ]);
+    
+    console.log('✅ FCM token fjernet');
   } catch (error) {
-    console.error('Feil ved fjerning av FCM token:', error);
+    // Sjekk om feilen skyldes ad-blocker eller Firestore-blokkering
+    const isBlocked = error.message?.includes('ERR_BLOCKED_BY_CLIENT') || 
+                     error.message?.includes('blocked') ||
+                     error.message?.includes('timeout') ||
+                     error.message?.includes('BLOCKED_BY_CLIENT') ||
+                     error.code === 'unavailable' ||
+                     error.code === 'permission-denied' ||
+                     error.code === 'deadline-exceeded';
+    
+    if (isBlocked) {
+      // Firestore er blokkert - dette er OK, vi fortsetter med utlogging
+      console.log('ℹ️ FCM token-fjerning hoppet over (Firestore blokkert)');
+    } else {
+      // Annet feil - logg men ikke kast feil
+      console.warn('⚠️ FCM token-fjerning feilet (ikke kritisk):', error.message);
+    }
+    // Ikke kast feil - utlogging skal fortsette uansett
   }
 };
 

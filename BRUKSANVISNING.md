@@ -12,6 +12,9 @@ Test appen direkte uten å laste ned noe.
 ### 💻 **VEI 2: Laste ned og kjøre lokalt** (30-60 minutter)
 Last ned prosjektet og kjør det på din maskin.
 
+### 👥 **VEI 3: Test kompisens versjon** (30-60 minutter)
+Test en kompis sin versjon av appen.
+
 ---
 
 # 🚀 VEI 1: Bare teste appen
@@ -33,11 +36,17 @@ Last ned prosjektet og kjør det på din maskin.
 
 ## 🌐 Test på nettleser
 
-**Web-link:** https://eventyrhagen-l3jt6bshb-msterys-projects.vercel.app
+**Web-link:** https://eventyrhagen-gwz38byho-msterys-projects.vercel.app
 
-Åpne lenken i nettleseren (Chrome, Firefox, Safari, Edge).
+Åpne lenken i nettleseren (Chrome, Firefox, Safari, Edge, Brave).
 
-**💡 Tips:** Hvis appen ikke laster inn på web, kan det være fordi ad-blocker blokkerer Firebase. Se `ADBLOCKER_FIX.md` for løsning.
+**💡 Tips:** Hvis appen ikke laster inn på web, kan det være fordi ad-blocker blokkerer Firebase.
+
+**🔧 Rask fiks for ad-blocker:**
+- **Chrome/Edge/Firefox:** Klikk på ad-blocker-ikonet i adresselinjen → "Deaktiver på denne siden" → Oppdater siden (F5)
+- **Brave:** Klikk på Brave Shields-ikonet (løve) → "Shields down" → Oppdater siden (F5)
+
+**📖 Detaljerte instruksjoner:** Se `ADBLOCKER_FIX.md` for alle nettlesere og ad-blockere.
 
 ### 📱 Legg til på hjemmeskjerm (app-ikon)
 
@@ -157,9 +166,16 @@ En QR-kode vises i terminalen. Skann med Expo Go, eller trykk `w` for web-versjo
 
 ## 🔗 Nyttige lenker
 
+**Din app:**
 - **QR-kode (mobil):** https://expo.dev/accounts/ms.tery/projects/fro/updates/e9776169-aec9-4d34-82bd-703eb5c6d55a
-- **Web-versjon:** https://eventyrhagen-l3jt6bshb-msterys-projects.vercel.app
+- **Web-versjon:** https://eventyrhagen-gwz38byho-msterys-projects.vercel.app
 - **GitHub:** https://github.com/kasa031/Fro
+
+**Kompisens app:**
+- **GitHub:** https://github.com/kripe00/Eventyrhagen
+- **QR-kode:** [Spør kompisen om Expo QR-kode lenken]
+
+**Generelt:**
 - **Expo Go (iOS):** https://apps.apple.com/app/expo-go/id982107779
 - **Expo Go (Android):** https://play.google.com/store/apps/details?id=host.exp.exponent
 

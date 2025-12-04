@@ -23,6 +23,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { getAvatar } from '../utils/avatarHelper';
+import { handleFirebaseError } from '../utils/errorHandler';
 
 /**
  * AdminScreen - Hovedskjerm for administratorer
@@ -103,6 +104,7 @@ export default function AdminScreen() {
   const [allActivities, setAllActivities] = useState([]);
   const [loadingActivities, setLoadingActivities] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [failedAvatars, setFailedAvatars] = useState(new Set()); // Sporer avatarene som har feilet
 
   /**
    * Legger til en e-postadresse til listen over foresatte
@@ -247,11 +249,9 @@ export default function AdminScreen() {
       });
       setDepartments(departmentsList);
     } catch (error) {
-      console.error('Feil ved lasting av avdelinger:', error);
-      if (Platform.OS === 'web') {
-        window.alert('Kunne ikke laste avdelinger: ' + error.message);
-      } else {
-        Alert.alert('Feil', 'Kunne ikke laste avdelinger: ' + error.message);
+      const errorMessage = handleFirebaseError(error, 'lasting av avdelinger', { showAlert: true, logError: true });
+      if (errorMessage && Platform.OS !== 'web') {
+        Alert.alert('Feil', 'Kunne ikke laste avdelinger: ' + errorMessage);
       }
     } finally {
       setLoadingDepartments(false);
@@ -370,10 +370,8 @@ export default function AdminScreen() {
       });
       setUsers(usersList);
     } catch (error) {
-      console.error('Feil ved lasting av brukere:', error);
-      if (Platform.OS === 'web') {
-        window.alert(t('userManagement.errorLoadingUsers'));
-      } else {
+      const errorMessage = handleFirebaseError(error, 'lasting av brukere', { showAlert: true, logError: true });
+      if (errorMessage && Platform.OS !== 'web') {
         Alert.alert(t('common.error'), t('userManagement.errorLoadingUsers'));
       }
     } finally {
@@ -394,11 +392,9 @@ export default function AdminScreen() {
       });
       setEmployees(employeesList);
     } catch (error) {
-      console.error('Feil ved lasting av ansatte:', error);
-      if (Platform.OS === 'web') {
-        window.alert(`Feil ved lasting av ansatte: ${error.message}`);
-      } else {
-        Alert.alert('Feil', `Kunne ikke laste ansatte: ${error.message}`);
+      const errorMessage = handleFirebaseError(error, 'lasting av ansatte', { showAlert: true, logError: true });
+      if (errorMessage && Platform.OS !== 'web') {
+        Alert.alert('Feil', `Kunne ikke laste ansatte: ${errorMessage}`);
       }
     } finally {
       setLoadingEmployees(false);
@@ -654,7 +650,7 @@ export default function AdminScreen() {
       
       setAllActivities(activitiesList);
     } catch (error) {
-      console.error('Feil ved lasting av aktiviteter:', error);
+      handleFirebaseError(error, 'lasting av aktiviteter', { showAlert: false, logError: true });
     } finally {
       setLoadingActivities(false);
     }
@@ -878,11 +874,9 @@ export default function AdminScreen() {
       // Last aktiviteter på nytt for å oppdatere navn i aktivitetslisten
       await loadAllActivities();
     } catch (error) {
-      console.error('Feil ved lasting av barn:', error);
-      if (Platform.OS === 'web') {
-        window.alert(`Feil ved lasting av barn: ${error.message}`);
-      } else {
-        Alert.alert('Feil', `Kunne ikke laste barn: ${error.message}`);
+      const errorMessage = handleFirebaseError(error, 'lasting av barn', { showAlert: true, logError: true });
+      if (errorMessage && Platform.OS !== 'web') {
+        Alert.alert('Feil', `Kunne ikke laste barn: ${errorMessage}`);
       }
     } finally {
       setLoadingChildren(false);
@@ -1357,7 +1351,18 @@ export default function AdminScreen() {
           <Text style={styles.headerTitle}>{t('admin.title')}</Text>
         </View>
         <View style={styles.headerActions}>
-          <TouchableOpacity onPress={logout} style={styles.logoutBtn}>
+          <TouchableOpacity 
+            onPress={async () => {
+              console.log('🔘 Logout-knapp trykket');
+              try {
+                await logout();
+                console.log('✅ Logout-funksjon fullført');
+              } catch (error) {
+                console.error('❌ Feil ved utlogging:', error);
+              }
+            }} 
+            style={styles.logoutBtn}
+          >
             <Ionicons name="log-out-outline" size={24} color="white" />
           </TouchableOpacity>
         </View>
@@ -1555,11 +1560,22 @@ export default function AdminScreen() {
                       >
                         <View style={styles.childCardHeader}>
                           <View style={styles.childInfo}>
-                            <View style={styles.childInfoRow}>
-                              <Image 
-                                source={{ uri: getAvatar(child.imageUrl, child.name, 'child', 200) }} 
-                                style={styles.childAvatar}
-                              />
+                          <View style={styles.childInfoRow}>
+                            <View style={styles.childAvatarContainer}>
+                              <View style={styles.childAvatarPlaceholder}>
+                                <Text style={styles.childAvatarText}>👶</Text>
+                              </View>
+                              {!failedAvatars.has(child.id) && (
+                                <Image 
+                                  source={{ uri: getAvatar(child.imageUrl, child.name, 'child', 200) }} 
+                                  style={styles.childAvatar}
+                                  onError={() => {
+                                    console.log('Avatar failed to load for:', child.name);
+                                    setFailedAvatars(prev => new Set(prev).add(child.id));
+                                  }}
+                                />
+                              )}
+                            </View>
                               <View style={styles.childNameContainer}>
                                 <Text style={themeStyles.childName}>{child.name || t('childProfile.noName')}</Text>
                                 <Text style={themeStyles.childDepartment}>{child.department || t('childProfile.noDepartment')}</Text>
@@ -2858,11 +2874,21 @@ export default function AdminScreen() {
                       <View style={styles.childCardHeader}>
                         <View style={styles.childInfo}>
                           <View style={styles.childInfoRow}>
-                            <Image 
-                              source={{ uri: getAvatar(child.imageUrl, child.name, 'child', 200) }} 
-                              style={styles.childAvatar}
-                              defaultSource={require('../../assets/nylogocolor.png')}
-                            />
+                            <View style={styles.childAvatarContainer}>
+                              <View style={styles.childAvatarPlaceholder}>
+                                <Text style={styles.childAvatarText}>👶</Text>
+                              </View>
+                              {!failedAvatars.has(child.id) && (
+                                <Image 
+                                  source={{ uri: getAvatar(child.imageUrl, child.name, 'child', 200) }} 
+                                  style={styles.childAvatar}
+                                  onError={() => {
+                                    console.log('Avatar failed to load for:', child.name);
+                                    setFailedAvatars(prev => new Set(prev).add(child.id));
+                                  }}
+                                />
+                              )}
+                            </View>
                             <View style={styles.childNameContainer}>
                               <Text style={themeStyles.childName}>{child.name || t('childProfile.noName')}</Text>
                               <Text style={themeStyles.childDepartment}>{child.department || t('childProfile.noDepartment')}</Text>
@@ -3152,9 +3178,9 @@ const styles = StyleSheet.create({
   content: { padding: 20, minHeight: Platform.OS === 'web' ? '100vh' : undefined },
   section: { marginBottom: 24 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#1f2937' },
+  sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#1f2937', textTransform: 'none', letterSpacing: 0, includeFontPadding: false },
   addButton: { backgroundColor: '#1e40af', borderWidth: 2, borderColor: 'white', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, minWidth: 140, justifyContent: 'center' },
-  addButtonText: { color: 'white', marginLeft: 6, fontWeight: '600', fontSize: 16 },
+  addButtonText: { color: 'white', marginLeft: 6, fontWeight: '600', fontSize: 16, textAlign: 'left', includeFontPadding: false, flexShrink: 1 },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3184,10 +3210,11 @@ const styles = StyleSheet.create({
   childCard: { backgroundColor: 'white', borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#e5e7eb', ...(Platform.OS === 'web' ? { boxShadow: '0 0 4px rgba(0, 0, 0, 0.05)' } : { shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 }) },
   childCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
   childInfo: { flex: 1 },
-  childInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  childAvatar: { width: 60, height: 60, borderRadius: 30, borderWidth: 2, borderColor: '#e5e7eb' },
-  childAvatarPlaceholder: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#4f46e5', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#e5e7eb' },
-  childAvatarText: { color: 'white', fontSize: 24, fontWeight: 'bold' },
+  childInfoRow: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 60 },
+  childAvatarContainer: { position: 'relative', width: 60, height: 60 },
+  childAvatar: { width: 60, height: 60, borderRadius: 30, borderWidth: 2, borderColor: '#e5e7eb', position: 'absolute', top: 0, left: 0 },
+  childAvatarPlaceholder: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#4f46e5', justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#e5e7eb', position: 'absolute', top: 0, left: 0 },
+  childAvatarText: { color: 'white', fontSize: 30 },
   childNameContainer: { flex: 1 },
   childName: { fontSize: 18, fontWeight: 'bold', color: '#1f2937', marginBottom: 4 },
   childDepartment: { fontSize: 14, color: '#6b7280' },
@@ -3336,8 +3363,8 @@ const styles = StyleSheet.create({
   departmentCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   departmentStats: { flexDirection: 'row', gap: 8 },
   statBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f4f6', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, gap: 6 },
-  statLabel: { fontSize: 14, fontWeight: '600', color: '#6b7280' },
-  statValue: { fontSize: 16, fontWeight: 'bold', color: '#1f2937' },
+  statLabel: { fontSize: 14, fontWeight: '600', color: '#6b7280', textAlign: 'left', includeFontPadding: false },
+  statValue: { fontSize: 16, fontWeight: 'bold', color: '#1f2937', textAlign: 'left', includeFontPadding: false },
   departmentStatusGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   statusColumn: { 
     flex: 1, 
@@ -3352,8 +3379,8 @@ const styles = StyleSheet.create({
   statusColumnMissing: { borderLeftWidth: 4, borderLeftColor: '#ef4444' },
   statusColumnSick: { borderLeftWidth: 4, borderLeftColor: '#f59e0b' },
   statusColumnPickedUp: { borderLeftWidth: 4, borderLeftColor: '#3b82f6' },
-  statusColumnTitle: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 },
-  statusColumnCount: { fontSize: 24, fontWeight: 'bold', marginBottom: 8 },
+  statusColumnTitle: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8, textAlign: 'left', includeFontPadding: false, width: '100%' },
+  statusColumnCount: { fontSize: 24, fontWeight: 'bold', marginBottom: 8, textAlign: 'left', includeFontPadding: false },
   statusCountPresent: { color: '#10b981' },
   statusCountMissing: { color: '#ef4444' },
   statusCountSick: { color: '#f59e0b' },
@@ -3377,7 +3404,9 @@ const styles = StyleSheet.create({
   },
   departmentStatItem: { 
     alignItems: 'center', 
-    flex: 1 
+    flex: 1,
+    minWidth: 0, // Forhindrer overflow
+    paddingHorizontal: 4
   },
   departmentStatValue: { 
     fontSize: 24, 
@@ -3388,8 +3417,12 @@ const styles = StyleSheet.create({
     fontSize: 11, 
     color: '#6b7280', 
     fontWeight: '500',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
+    textTransform: 'none',
+    letterSpacing: 0,
+    textAlign: 'center',
+    width: '100%',
+    flexWrap: 'wrap',
+    includeFontPadding: false
   },
   dashboardSection: { marginBottom: 24 },
   statsGrid: { 
@@ -3415,13 +3448,18 @@ const styles = StyleSheet.create({
   statLabel: {
     fontSize: 14,
     fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
+    textTransform: 'none',
+    letterSpacing: 0,
+    textAlign: 'left',
+    includeFontPadding: false,
+    width: '100%'
   },
   statValue: {
     fontSize: 32,
     fontWeight: 'bold',
-    marginTop: 4
+    marginTop: 4,
+    textAlign: 'left',
+    includeFontPadding: false
   },
   avatarOverview: {
     borderRadius: 16,

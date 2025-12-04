@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { doc, getDoc, updateDoc, serverTimestamp, query, where, getDocs, collection, deleteDoc, addDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, serverTimestamp, query, where, getDocs, collection, deleteDoc, addDoc, onSnapshot, orderBy } from 'firebase/firestore';
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Linking } from 'react-native';
@@ -22,6 +22,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { Image } from 'react-native';
 import { getAvatar } from '../utils/avatarHelper';
+import { handleFirebaseError } from '../utils/errorHandler';
 
 /**
  * ChildProfileScreen - Profilskjerm for et spesifikt barn
@@ -73,7 +74,6 @@ export default function ChildProfileScreen() {
   useEffect(() => {
     if (childId) {
       loadChild();
-      loadActivities();
       loadConsentForm();
     } else {
       console.error('ChildProfileScreen: childId mangler');
@@ -84,6 +84,89 @@ export default function ChildProfileScreen() {
       }
       navigation.goBack();
     }
+  }, [childId]);
+
+  // Sanntidsoppdatering for aktiviteter
+  useEffect(() => {
+    if (!childId) return;
+
+    setLoadingActivities(true);
+    let checkInOutUnsubscribe = null;
+    let activitiesUnsubscribe = null;
+    let checkInOutActivities = [];
+    let childActivities = [];
+
+    const updateCombinedActivities = () => {
+      const combined = [...checkInOutActivities, ...childActivities];
+      combined.sort((a, b) => {
+        const aTime = a.timestamp?.toDate?.() || new Date(0);
+        const bTime = b.timestamp?.toDate?.() || new Date(0);
+        return bTime - aTime;
+      });
+      setActivities(combined);
+      setLoadingActivities(false);
+    };
+
+    try {
+      // Sanntidsoppdatering for check-in/out logger (uten orderBy for å unngå index-feil)
+      const checkInOutQuery = query(
+        collection(db, 'checkInOutLogs'),
+        where('childId', '==', childId)
+      );
+      
+      checkInOutUnsubscribe = onSnapshot(checkInOutQuery, (snapshot) => {
+        checkInOutActivities = [];
+        snapshot.forEach((doc) => {
+          const data = doc.data();
+          checkInOutActivities.push({
+            id: doc.id,
+            type: data.action === 'check_in' ? 'check_in' : 'check_out',
+            timestamp: data.timestamp,
+            userId: data.userId,
+            activityType: data.action
+          });
+        });
+        updateCombinedActivities();
+      }, (error) => {
+        console.warn('Sanntidsoppdatering for check-in/out feilet, bruker manuell oppdatering:', error);
+        // Fallback til manuell oppdatering hvis sanntid feiler
+        setLoadingActivities(false);
+      });
+        
+      // Sanntidsoppdatering for childActivities (uten orderBy)
+      const activitiesQuery = query(
+        collection(db, 'childActivities'),
+        where('childId', '==', childId)
+      );
+      
+      activitiesUnsubscribe = onSnapshot(activitiesQuery, (activitiesSnapshot) => {
+        childActivities = [];
+        activitiesSnapshot.forEach((doc) => {
+          const data = doc.data();
+          childActivities.push({
+            id: doc.id,
+            type: data.activityType,
+            timestamp: data.timestamp,
+            userId: data.userId,
+            notes: data.notes || '',
+            activityType: data.activityType
+          });
+        });
+        updateCombinedActivities();
+      }, (error) => {
+        console.warn('Sanntidsoppdatering for aktiviteter feilet, bruker manuell oppdatering:', error);
+        setLoadingActivities(false);
+      });
+    } catch (error) {
+      console.error('Feil ved oppsett av sanntidsoppdatering:', error);
+      setLoadingActivities(false);
+    }
+
+    // Cleanup ved unmount eller når childId endres
+    return () => {
+      if (checkInOutUnsubscribe) checkInOutUnsubscribe();
+      if (activitiesUnsubscribe) activitiesUnsubscribe();
+    };
   }, [childId]);
 
   const loadParentEmails = async (parentIds) => {
@@ -106,90 +189,11 @@ export default function ChildProfileScreen() {
       setParentEmails(emails);
       setParentData(parentInfo);
     } catch (error) {
-      console.error('Feil ved lasting av foreldre-e-post:', error);
+      handleFirebaseError(error, 'lasting av foreldre-e-post', { showAlert: false, logError: true });
     }
   };
 
-  const loadActivities = async () => {
-    if (!childId) {
-      console.error('loadActivities: childId er undefined');
-      setLoadingActivities(false);
-      setActivities([]);
-      return;
-    }
-    
-    setLoadingActivities(true);
-    try {
-      const allActivities = [];
-      
-      // Hent inn/ut-logger
-      try {
-        const checkInOutQuery = query(
-          collection(db, 'checkInOutLogs'),
-          where('childId', '==', childId)
-        );
-        const checkInOutSnapshot = await getDocs(checkInOutQuery);
-        checkInOutSnapshot.forEach((doc) => {
-          const data = doc.data();
-          allActivities.push({
-            id: doc.id,
-            type: data.action === 'check_in' ? 'check_in' : 'check_out',
-            timestamp: data.timestamp,
-            userId: data.userId,
-            activityType: data.action
-          });
-        });
-      } catch (checkInOutError) {
-        console.error('Feil ved lasting av check-in/out logger:', checkInOutError);
-        // Fortsett med å laste andre aktiviteter selv om dette feiler
-      }
-      
-      // Hent andre aktiviteter (bleieskift, spesielle hendelser)
-      try {
-        const activitiesQuery = query(
-          collection(db, 'childActivities'),
-          where('childId', '==', childId)
-        );
-        const activitiesSnapshot = await getDocs(activitiesQuery);
-        activitiesSnapshot.forEach((doc) => {
-          const data = doc.data();
-          allActivities.push({
-            id: doc.id,
-            type: data.activityType,
-            timestamp: data.timestamp,
-            userId: data.userId,
-            notes: data.notes || '',
-            activityType: data.activityType
-          });
-        });
-      } catch (activitiesError) {
-        console.error('Feil ved lasting av aktiviteter:', activitiesError);
-        // Fortsett selv om dette feiler
-      }
-      
-      // Sorter etter timestamp (nyeste først)
-      allActivities.sort((a, b) => {
-        const aTime = a.timestamp?.toDate?.() || new Date(0);
-        const bTime = b.timestamp?.toDate?.() || new Date(0);
-        return bTime - aTime;
-      });
-      
-      setActivities(allActivities);
-    } catch (error) {
-      console.error('Feil ved lasting av aktiviteter:', error);
-      // Vis feilmelding hvis det er en kritisk feil
-      if (error.code === 'permission-denied') {
-        if (Platform.OS === 'web') {
-          window.alert('Du har ikke tilgang til å se aktiviteter for dette barnet.');
-        } else {
-          Alert.alert('Feil', 'Du har ikke tilgang til å se aktiviteter for dette barnet.');
-        }
-      }
-      setActivities([]);
-    } finally {
-      setLoadingActivities(false);
-    }
-  };
+  // loadActivities er nå erstattet av sanntidsoppdatering i useEffect over
 
   const handleDiaperChange = async () => {
     try {
@@ -201,7 +205,7 @@ export default function ChildProfileScreen() {
         notes: ''
       });
       
-      await loadActivities(); // Oppdater dashboard
+      // Sanntidsoppdatering vil automatisk oppdatere dashboard
       
       if (Platform.OS === 'web') {
         window.alert(t('activity.diaperChangeRegistered', { defaultValue: 'Bleieskift registrert!' }));
@@ -442,7 +446,7 @@ export default function ChildProfileScreen() {
             setParentData([]);
           }
         } catch (parentError) {
-          console.error('Feil ved lasting av foreldre:', parentError);
+          handleFirebaseError(parentError, 'lasting av foreldre', { showAlert: false, logError: true });
           setParentEmails([]);
           setParentData([]);
         }
@@ -455,15 +459,14 @@ export default function ChildProfileScreen() {
         navigation.goBack();
       }
     } catch (error) {
-      console.error('Feil ved lasting av barn:', error);
-      let errorMessage = `Kunne ikke laste barn: ${error.message}`;
-      if (error.code === 'permission-denied') {
-        errorMessage = 'Du har ikke tilgang til å se dette barnet.';
-      }
-      if (Platform.OS === 'web') {
-        window.alert(`Feil: ${errorMessage}`);
-      } else {
-        Alert.alert('Feil', errorMessage);
+      const errorMessage = handleFirebaseError(error, 'lasting av barn', { showAlert: false, logError: true });
+      if (errorMessage && error.code === 'permission-denied' && !error.message?.includes('blocked')) {
+        const alertMessage = 'Du har ikke tilgang til å se dette barnet.';
+        if (Platform.OS === 'web') {
+          window.alert(`Feil: ${alertMessage}`);
+        } else {
+          Alert.alert('Feil', alertMessage);
+        }
       }
       navigation.goBack();
     } finally {
@@ -540,7 +543,7 @@ export default function ChildProfileScreen() {
       });
       
       loadChild();
-      loadActivities(); // Oppdater dashboard
+      // Sanntidsoppdatering vil automatisk oppdatere dashboard
       
       if (Platform.OS === 'web') {
         window.alert(t('admin.childCheckedIn', { name: child.name }));
@@ -573,7 +576,7 @@ export default function ChildProfileScreen() {
       });
       
       loadChild();
-      loadActivities(); // Oppdater dashboard
+      // Sanntidsoppdatering vil automatisk oppdatere dashboard
       
       if (Platform.OS === 'web') {
         window.alert(t('admin.childCheckedOut', { name: child.name }));
@@ -605,7 +608,7 @@ export default function ChildProfileScreen() {
       });
       
       loadChild();
-      loadActivities();
+      // Sanntidsoppdatering vil automatisk oppdatere
       
       if (Platform.OS === 'web') {
         window.alert(t('admin.childMarkedSick', { name: child.name }));
@@ -639,7 +642,7 @@ export default function ChildProfileScreen() {
       });
       
       loadChild();
-      loadActivities();
+      // Sanntidsoppdatering vil automatisk oppdatere
       
       if (Platform.OS === 'web') {
         window.alert(t('admin.sickCleared', { name: child.name }));
@@ -937,7 +940,7 @@ export default function ChildProfileScreen() {
         setPickupPersons(consentData.pickupPersons?.length > 0 ? consentData.pickupPersons : [{ name: '', phone: '', relation: '' }]);
       }
     } catch (error) {
-      console.error('Feil ved lasting av samtykkeskjema:', error);
+      handleFirebaseError(error, 'lasting av samtykkeskjema', { showAlert: false, logError: true });
     }
   };
 
@@ -1290,7 +1293,13 @@ export default function ChildProfileScreen() {
                         default:
                           activityLabel = 'Ukjent aktivitet';
                           activityIcon = 'help-circle';
+                          activityColor = '#6b7280';
                       }
+                      
+                      // Sjekk om aktiviteten kan slettes (alle unntatt check_in og check_out)
+                      const canDelete = activity.id && 
+                                       (activity.activityType || activity.type) !== 'check_in' && 
+                                       (activity.activityType || activity.type) !== 'check_out';
                       
                       return (
                         <View key={activity.id || index} style={styles.activityItem}>
@@ -1300,25 +1309,32 @@ export default function ChildProfileScreen() {
                           <View style={styles.activityInfo}>
                             <Text style={styles.activityLabel}>{activityLabel}</Text>
                             <Text style={styles.activityTime}>{dateStr} {timeStr}</Text>
+                            {/* Vis aktivitetstype for debugging hvis ukjent */}
+                            {activityLabel === 'Ukjent aktivitet' && (activity.activityType || activity.type) && (
+                              <Text style={[styles.activityTime, { fontSize: 10, color: '#9ca3af', marginTop: 4 }]}>
+                                Type: {activity.activityType || activity.type}
+                              </Text>
+                            )}
                           </View>
-                          {role === 'admin' && activity.activityType && activity.activityType !== 'check_in' && activity.activityType !== 'check_out' && (
+                          {role === 'admin' && canDelete && (
                             <TouchableOpacity
                               style={styles.deleteActivityButton}
                               onPress={async () => {
+                                if (!activity.id) {
+                                  Alert.alert('Feil', 'Aktivitet mangler ID - kan ikke slettes');
+                                  return;
+                                }
+                                
                                 const confirmMessage = `Er du sikker på at du vil slette denne aktiviteten?`;
                                 if (Platform.OS === 'web') {
                                   if (window.confirm(confirmMessage)) {
                                     try {
                                       await deleteDoc(doc(db, 'childActivities', activity.id));
-                                      await loadActivities();
+                                      // Sanntidsoppdatering vil automatisk oppdatere listen
                                       window.alert('Aktivitet slettet!');
                                     } catch (error) {
                                       console.error('Feil ved sletting:', error);
-                                      let errorMessage = 'Kunne ikke slette aktivitet.';
-                                      if (error.code === 'permission-denied') {
-                                        errorMessage = 'Du har ikke tilgang til å slette aktiviteter. Kun admin kan slette.';
-                                      }
-                                      window.alert(errorMessage);
+                                      handleFirebaseError(error, 'sletting av aktivitet', { showAlert: true, logError: true });
                                     }
                                   }
                                 } else {
@@ -1330,15 +1346,11 @@ export default function ChildProfileScreen() {
                                       onPress: async () => {
                                         try {
                                           await deleteDoc(doc(db, 'childActivities', activity.id));
-                                          await loadActivities();
+                                          // Sanntidsoppdatering vil automatisk oppdatere listen
                                           Alert.alert('Suksess', 'Aktivitet slettet!');
                                         } catch (error) {
                                           console.error('Feil ved sletting:', error);
-                                          let errorMessage = 'Kunne ikke slette aktivitet.';
-                                          if (error.code === 'permission-denied') {
-                                            errorMessage = 'Du har ikke tilgang til å slette aktiviteter. Kun admin kan slette.';
-                                          }
-                                          Alert.alert('Feil', errorMessage);
+                                          handleFirebaseError(error, 'sletting av aktivitet', { showAlert: true, logError: true });
                                         }
                                       },
                                     },
@@ -1943,9 +1955,9 @@ const styles = StyleSheet.create({
   activitiesList: { gap: 8 },
   activityItem: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f9fafb', padding: 12, borderRadius: 8, gap: 12 },
   activityIconContainer: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  activityInfo: { flex: 1 },
-  activityLabel: { fontSize: 16, fontWeight: '600', color: '#1f2937', marginBottom: 4 },
-  activityTime: { fontSize: 12, color: '#6b7280' },
+  activityInfo: { flex: 1, justifyContent: 'center' },
+  activityLabel: { fontSize: 16, fontWeight: '600', color: '#1f2937', marginBottom: 4, textAlign: 'left', includeFontPadding: false },
+  activityTime: { fontSize: 12, color: '#6b7280', textAlign: 'left', includeFontPadding: false },
   deleteActivityButton: { padding: 8, marginLeft: 8 },
   addActivityButton: { padding: 4 },
   // Modal stiler
@@ -1962,6 +1974,7 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 40,
     maxHeight: Platform.OS === 'web' ? '90vh' : '90%',
+    height: Platform.OS === 'web' ? 'auto' : '90%',
     width: Platform.OS === 'web' ? '90%' : '100%',
     maxWidth: Platform.OS === 'web' ? 600 : '100%',
     ...(Platform.OS === 'web' ? { borderRadius: 20 } : {})
