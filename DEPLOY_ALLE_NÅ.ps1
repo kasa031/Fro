@@ -1,11 +1,15 @@
 # 🚀 Deploy til alle plattformer og push til GitHub
 
 # STEG 1: Gå inn i prosjektmappen
-cd "c:\Users\Karina\Desktop\2025_2026\SmidigProsjekt\Eventyrhagen"
+Set-Location "c:\Users\Karina\Desktop\2025_2026\SmidigProsjekt\Eventyrhagen"
 
 # STEG 2: Deploy til Expo (mobil)
 Write-Host "`n📱 Deployer til Expo (mobil)..." -ForegroundColor Yellow
-npx eas update --branch production --message "Deploy: Fikset vertikal tekst-rendering, avatar-lasting (PNG), PWA optimalisering"
+# Slett dist-mappen hvis den eksisterer for å unngå konflikter
+if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" }
+# Kjør EAS update direkte (den eksporterer automatisk)
+$env:CI = "1"
+npx eas update --branch production --message "Deploy: Klikkbare avdelinger med modal, horisontal layout, fikset alignment" --non-interactive
 
 # STEG 3: Bygg og deploy web-versjonen til Vercel
 Write-Host "`n🌐 Bygger web-versjonen..." -ForegroundColor Yellow
@@ -20,7 +24,7 @@ git add .
 
 # STEG 5: Commit
 Write-Host "`n💾 Committer endringer..." -ForegroundColor Yellow
-git commit -m "Deploy: Fikset vertikal tekst-rendering i avdelinger, avatar-lasting (PNG), PWA optimalisering, sanntidsoppdatering"
+git commit -m "Deploy: Klikkbare avdelinger med modal, horisontal layout, fikset alignment"
 
 # STEG 6: Push til GitHub
 Write-Host "`n⬆️ Pusher til GitHub..." -ForegroundColor Yellow

@@ -94,6 +94,10 @@ export default function AdminScreen() {
   const [showDashboardModal, setShowDashboardModal] = useState(false);
   const [dashboardFilter, setDashboardFilter] = useState(null); // 'all', 'present', 'notCheckedIn', 'sick'
   
+  // Modal for å vise avdelingsdetaljer
+  const [showDepartmentDetailModal, setShowDepartmentDetailModal] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState(null);
+  
   // Aktivitetsregistrering
   const [showActivityModal, setShowActivityModal] = useState(false);
   const [activityNotes, setActivityNotes] = useState('');
@@ -1054,6 +1058,12 @@ export default function AdminScreen() {
   // Naviger til barneprofil
   const handleViewChildProfile = (childId) => {
     navigation.navigate('ChildProfile', { childId });
+  };
+
+  // Vis avdelingsdetaljer
+  const handleViewDepartmentDetails = (department) => {
+    setSelectedDepartment(department);
+    setShowDepartmentDetailModal(true);
   };
 
   // Slette barn
@@ -2155,12 +2165,24 @@ export default function AdminScreen() {
                       return (
                         <View key={dept.id} style={[themeStyles.childCard, styles.departmentCard]}>
                           <View style={styles.departmentCardHeader}>
-                            <View style={styles.departmentInfo}>
-                              <Text style={[themeStyles.sectionTitle, { marginBottom: 4, fontSize: 18 }]}>{dept.name}</Text>
-                              <Text style={[themeStyles.childDepartment, { marginBottom: 0 }]}>
-                                {deptChildren.length} {deptChildren.length === 1 ? 'barn' : 'barn'}
-                              </Text>
-                            </View>
+                            <TouchableOpacity
+                              style={{ flex: 1 }}
+                              onPress={() => handleViewDepartmentDetails(dept)}
+                              activeOpacity={0.7}
+                            >
+                              <View style={styles.departmentInfo}>
+                                <Text 
+                                  style={[themeStyles.sectionTitle, { marginBottom: 4, fontSize: 18 }]}
+                                  numberOfLines={1}
+                                  ellipsizeMode="tail"
+                                >
+                                  {dept.name}
+                                </Text>
+                                <Text style={[themeStyles.childDepartment, { marginBottom: 0 }]}>
+                                  {deptChildren.length} {deptChildren.length === 1 ? 'barn' : 'barn'}
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
                             <TouchableOpacity
                               style={styles.deleteButton}
                               onPress={() => handleDeleteDepartment(dept.id, dept.name)}
@@ -2169,6 +2191,10 @@ export default function AdminScreen() {
                             </TouchableOpacity>
                           </View>
                           
+                          <TouchableOpacity
+                            onPress={() => handleViewDepartmentDetails(dept)}
+                            activeOpacity={0.7}
+                          >
                           <View style={styles.departmentStatsRow}>
                             <View style={styles.departmentStatItem}>
                               <Text style={[styles.departmentStatValue, { color: '#10b981' }]}>{present}</Text>
@@ -2191,6 +2217,7 @@ export default function AdminScreen() {
                               </View>
                             )}
                           </View>
+                          </TouchableOpacity>
                         </View>
                       );
                     })}
@@ -2198,6 +2225,116 @@ export default function AdminScreen() {
                 )}
               </View>
             )}
+
+            {/* Modal for avdelingsdetaljer */}
+            <Modal
+              visible={showDepartmentDetailModal}
+              transparent={true}
+              animationType="slide"
+              onRequestClose={() => setShowDepartmentDetailModal(false)}
+            >
+              <View style={styles.modalOverlay}>
+                <View style={[styles.modalContent, isDarkMode && styles.modalContentDark]}>
+                  <View style={styles.modalHeader}>
+                    <Text style={[styles.modalTitle, { color: isDarkMode ? '#f3f4f6' : '#1f2937' }]}>
+                      {selectedDepartment?.name || t('admin.department')}
+                    </Text>
+                    <TouchableOpacity onPress={() => setShowDepartmentDetailModal(false)}>
+                      <Ionicons name="close" size={24} color={isDarkMode ? '#f3f4f6' : '#1f2937'} />
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView showsVerticalScrollIndicator={true} style={{ maxHeight: '80%' }}>
+                    {selectedDepartment && (() => {
+                      const deptChildren = children.filter(c => c.department === selectedDepartment.name);
+                      const present = deptChildren.filter(c => c.status === 'checked_in');
+                      const missing = deptChildren.filter(c => c.status !== 'checked_in' && c.status !== 'checked_out' && c.status !== 'sick');
+                      const sick = deptChildren.filter(c => c.status === 'sick');
+                      const pickedUp = deptChildren.filter(c => c.status === 'checked_out');
+
+                      return (
+                        <View>
+                          <View style={styles.departmentDetailStats}>
+                            <View style={styles.detailStatCard}>
+                              <Text style={[styles.detailStatValue, { color: '#10b981' }]}>{present.length}</Text>
+                              <Text style={styles.detailStatLabel}>{t('admin.present')}</Text>
+                            </View>
+                            <View style={styles.detailStatCard}>
+                              <Text style={[styles.detailStatValue, { color: '#ef4444' }]}>{missing.length}</Text>
+                              <Text style={styles.detailStatLabel}>{t('admin.notCheckedIn')}</Text>
+                            </View>
+                            {sick.length > 0 && (
+                              <View style={styles.detailStatCard}>
+                                <Text style={[styles.detailStatValue, { color: '#f59e0b' }]}>{sick.length}</Text>
+                                <Text style={styles.detailStatLabel}>{t('admin.sick')}</Text>
+                              </View>
+                            )}
+                            {pickedUp.length > 0 && (
+                              <View style={styles.detailStatCard}>
+                                <Text style={[styles.detailStatValue, { color: '#3b82f6' }]}>{pickedUp.length}</Text>
+                                <Text style={styles.detailStatLabel}>{t('admin.pickedUp')}</Text>
+                              </View>
+                            )}
+                          </View>
+
+                          <Text style={[themeStyles.sectionTitle, { marginTop: 20, marginBottom: 12 }]}>
+                            {t('admin.allChildren')} ({deptChildren.length})
+                          </Text>
+
+                          {deptChildren.length === 0 ? (
+                            <Text style={themeStyles.emptyText}>{t('admin.noChildren')}</Text>
+                          ) : (
+                            <View style={styles.childrenList}>
+                              {deptChildren.map((child) => (
+                                <TouchableOpacity
+                                  key={child.id}
+                                  style={[themeStyles.childCard, { marginBottom: 12 }]}
+                                  onPress={() => {
+                                    setShowDepartmentDetailModal(false);
+                                    handleViewChildProfile(child.id);
+                                  }}
+                                >
+                                  <View style={styles.childCardHeader}>
+                                    <View style={styles.childInfo}>
+                                      <View style={styles.childInfoRow}>
+                                        <View style={styles.childAvatarContainer}>
+                                          <View style={styles.childAvatarPlaceholder}>
+                                            <Text style={styles.childAvatarText}>👶</Text>
+                                          </View>
+                                          {!failedAvatars.has(child.id) && (
+                                            <Image 
+                                              source={{ uri: getAvatar(child.imageUrl, child.name, 'child', 200) }} 
+                                              style={styles.childAvatar}
+                                              onError={() => {
+                                                console.log('Avatar failed to load for:', child.name);
+                                                setFailedAvatars(prev => new Set(prev).add(child.id));
+                                              }}
+                                            />
+                                          )}
+                                        </View>
+                                        <View style={styles.childNameContainer}>
+                                          <Text style={themeStyles.childName}>{child.name || t('childProfile.noName')}</Text>
+                                          <Text style={themeStyles.childDepartment}>
+                                            {child.status === 'checked_in' ? t('admin.present') :
+                                             child.status === 'checked_out' ? t('admin.pickedUp') :
+                                             child.status === 'sick' ? t('admin.sick') :
+                                             t('admin.notCheckedIn')}
+                                          </Text>
+                                        </View>
+                                      </View>
+                                    </View>
+                                  </View>
+                                </TouchableOpacity>
+                              ))}
+                            </View>
+                          )}
+                        </View>
+                      );
+                    })()}
+                  </ScrollView>
+                </View>
+              </View>
+            </Modal>
 
             {/* Avdelingsadministrasjon (legg til/slett) */}
             {showDepartmentManagement && (
@@ -3178,7 +3315,16 @@ const styles = StyleSheet.create({
   content: { padding: 20, minHeight: Platform.OS === 'web' ? '100vh' : undefined },
   section: { marginBottom: 24 },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#1f2937', textTransform: 'none', letterSpacing: 0, includeFontPadding: false },
+  sectionTitle: { 
+    fontSize: 20, 
+    fontWeight: 'bold', 
+    color: '#1f2937', 
+    textTransform: 'none', 
+    letterSpacing: 0, 
+    includeFontPadding: false,
+    textAlign: 'left',
+    flexWrap: 'nowrap'
+  },
   addButton: { backgroundColor: '#1e40af', borderWidth: 2, borderColor: 'white', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, minWidth: 140, justifyContent: 'center' },
   addButtonText: { color: 'white', marginLeft: 6, fontWeight: '600', fontSize: 16, textAlign: 'left', includeFontPadding: false, flexShrink: 1 },
   searchContainer: {
@@ -3223,7 +3369,11 @@ const styles = StyleSheet.create({
   checkOutButton: { padding: 8 },
   sickButton: { padding: 8 },
   clearSickButton: { padding: 8 },
-  deleteButton: { padding: 8 },
+  deleteButton: { 
+    padding: 8,
+    alignSelf: 'flex-start', // Sørger for at delete-knappen alltid er på samme posisjon
+    marginTop: 0 // Fjerner eventuell margin som kan forårsake misalignment
+  },
   childDetails: { borderTopWidth: 1, borderTopColor: '#e5e7eb', paddingTop: 12 },
   detailRow: { flexDirection: 'row', marginBottom: 8, flexWrap: 'wrap' },
   detailLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginRight: 8, minWidth: 80 },
@@ -3292,6 +3442,34 @@ const styles = StyleSheet.create({
   adminBadge: { padding: 6, backgroundColor: '#fef3c7', color: '#92400e', borderRadius: 6, fontSize: 12, fontWeight: '600' },
   activityModal: { backgroundColor: 'white', borderRadius: 12, padding: 20, width: '90%', maxHeight: '80%' },
   activityModalDark: { backgroundColor: '#374151' },
+  modalContentDark: { backgroundColor: '#374151' },
+  departmentDetailStats: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginBottom: 20
+  },
+  detailStatCard: {
+    flex: 1,
+    minWidth: 100,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb'
+  },
+  detailStatValue: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    marginBottom: 8
+  },
+  detailStatLabel: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '500',
+    textAlign: 'center'
+  },
   modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 },
   modalTitle: { fontSize: 20, fontWeight: 'bold' },
   childSelectButton: { padding: 12, borderRadius: 8, borderWidth: 1, borderColor: '#d1d5db', marginBottom: 8 },
@@ -3359,7 +3537,14 @@ const styles = StyleSheet.create({
     marginTop: 8
   },
   departmentOverviewList: { gap: 16 },
-  departmentCard: { marginBottom: 0 },
+  departmentCard: { 
+    marginBottom: 0,
+    width: '30%', // Hver kort tar ca 30% av bredden (3 kort per rad)
+    minWidth: 200, // Minimum bredde for hvert kort
+    maxWidth: 300, // Maks bredde for å unngå for brede kort
+    minHeight: 140, // Fast minimum høyde for konsistent layout
+    alignSelf: 'stretch' // Sørger for at alle kort har samme høyde
+  },
   departmentCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   departmentStats: { flexDirection: 'row', gap: 8 },
   statBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#f3f4f6', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, gap: 6 },
@@ -3391,27 +3576,40 @@ const styles = StyleSheet.create({
   departmentsGrid: { 
     flexDirection: 'row', 
     flexWrap: 'wrap', 
-    gap: 12 
+    gap: 12,
+    alignItems: 'stretch', // Sørger for at alle kort har samme høyde
+    justifyContent: 'flex-start' // Starter fra venstre
   },
-  departmentInfo: { flex: 1 },
+  departmentInfo: { 
+    flex: 1, 
+    minWidth: 0, // Forhindrer overflow
+    paddingRight: 8
+  },
   departmentStatsRow: { 
     flexDirection: 'row', 
     gap: 16, 
-    marginTop: 12, 
+    marginTop: 0, // Endret fra 12 for bedre alignment
     paddingTop: 12, 
     borderTopWidth: 1, 
-    borderTopColor: '#e5e7eb' 
+    borderTopColor: '#e5e7eb',
+    alignItems: 'flex-start', // Sørger for at alle items starter på samme høyde
+    minHeight: 60 // Fast minimum høyde for stats-raden
   },
   departmentStatItem: { 
     alignItems: 'center', 
+    justifyContent: 'flex-start', // Endret fra 'center' for bedre vertikal alignment
     flex: 1,
-    minWidth: 0, // Forhindrer overflow
-    paddingHorizontal: 4
+    minWidth: 70, // Minimum bredde for å unngå at teksten blir for smal
+    paddingHorizontal: 2,
+    maxWidth: '100%',
+    flexBasis: 0, // Gjør at flex: 1 fungerer bedre med minWidth
+    minHeight: 60 // Fast minimum høyde for konsistent layout
   },
   departmentStatValue: { 
     fontSize: 24, 
     fontWeight: 'bold', 
-    marginBottom: 4 
+    marginBottom: 4,
+    minHeight: 30 // Fast høyde for tallene
   },
   departmentStatLabel: { 
     fontSize: 11, 
@@ -3420,8 +3618,6 @@ const styles = StyleSheet.create({
     textTransform: 'none',
     letterSpacing: 0,
     textAlign: 'center',
-    width: '100%',
-    flexWrap: 'wrap',
     includeFontPadding: false
   },
   dashboardSection: { marginBottom: 24 },
